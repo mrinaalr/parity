@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="160 40 360 120" width="320" role="img" aria-label="Two position cards joined by a wire with one parity bit between them">
+<g fill="none" stroke="#8b949e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+<path d="M182 52 q-4 2 -3 8 l2 76 q0 5 5 4 l88 1 q5 0 4 -5 l-3 -80 q0 -5 -5 -4 z"/>
+<path d="M200 76 l52 -1"/><path d="M200 92 l62 1"/><path d="M200 108 l40 -1"/><path d="M200 124 l56 0"/>
+<path d="M414 56 q-4 1 -4 6 l-2 80 q0 5 5 5 l86 -2 q5 0 4 -5 l0 -78 q0 -5 -5 -5 z"/>
+<path d="M430 80 l50 1"/><path d="M430 96 l62 -1"/><path d="M430 112 l38 1"/><path d="M430 128 l58 -1"/>
+<path d="M280 102 q20 -6 40 2 t36 0"/>
+<path d="M330 92 l24 2 l-1 20 l-22 -1 z"/>
+<path d="M341 97 q3 0 3 4 t-3 4 q-4 0 -4 -4 t4 -4" stroke-width="2"/>
+<path d="M364 104 q20 -5 40 1 t8 0"/>
+</g>
+</svg>
