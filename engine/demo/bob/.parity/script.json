@@ -1,0 +1,91 @@
+{
+  "cards": [
+    {
+      "problem": "Retried POST /orders calls create duplicate orders.",
+      "decision": "Deduplicate POST /orders by hashing the request body and dropping any repeat seen in the last ten minutes.",
+      "constraints": [
+        "No client changes are required.",
+        "Dedup state lives in Redis with a ten minute TTL."
+      ],
+      "acceptance": [
+        "Two identical POSTs within ten minutes create one order.",
+        "Identical POSTs eleven minutes apart create two orders."
+      ],
+      "evidence": [
+        { "summary": "Retry storms in the September incident came from one mobile client version.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+      ],
+      "key_terms": {
+        "idempotent": { "definition": "A request is idempotent when sending it again, from any client and with no special header, cannot create a second order." },
+        "retry storm": { "definition": "Many clients resending the same request within seconds after a timeout." }
+      },
+      "would_change_my_mind": "Evidence that legitimate distinct orders often share an identical body within ten minutes."
+    }
+  ],
+  "teachbacks": [
+    {
+      "problem": "Clients that retry a failed POST /orders can end up creating the same order twice.",
+      "decision": "Add an Idempotency-Key header to POST /orders and keep the first response for a day.",
+      "constraints": [
+        "Keys belong to one client account.",
+        "A repeat gets back the exact stored response.",
+        "GET endpoints are untouched."
+      ],
+      "acceptance": [
+        "Posting twice with one key inside a day makes a single order.",
+        "Reusing a key with a changed body is rejected with 422.",
+        "p99 latency grows by less than 5 ms under load."
+      ],
+      "evidence": [
+        { "summary": "Last month's incident review found duplicate orders.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+      ],
+      "key_terms": {
+        "idempotent": { "definition": "A request is idempotent when sending it again never creates a second order." },
+        "retry": { "definition": "A client sending a request again after a timeout or server error." }
+      },
+      "would_change_my_mind": "Proof that clients cannot keep a key alive across a crash."
+    },
+    {
+      "problem": "Clients that retry a failed POST /orders can end up creating the same order twice.",
+      "decision": "Add an Idempotency-Key header to POST /orders and keep the first response for a day.",
+      "constraints": [
+        "Keys belong to one client account.",
+        "A repeat with the same key gets back the exact stored response.",
+        "GET endpoints are untouched."
+      ],
+      "acceptance": [
+        "Posting twice with one key inside a day makes a single order.",
+        "Reusing a key with a changed body is rejected with 422.",
+        "p99 latency grows by less than 5 ms under load."
+      ],
+      "evidence": [
+        { "summary": "Last month's incident review found duplicate orders.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+      ],
+      "key_terms": {
+        "idempotent": { "definition": "A request is idempotent when the same account resends it with the same Idempotency-Key and gets the stored first response rather than a new order; no key or a new key means a new request." },
+        "retry": { "definition": "A client sending a request again, with the same key, after a timeout or server error." }
+      },
+      "would_change_my_mind": "Proof that clients cannot keep a key alive across a crash."
+    }
+  ],
+  "termchecks": {
+    "idempotent": {
+      "examples": [
+        "POST /orders twice with the same body: one order.",
+        "POST /orders with the same body from two clients: one order.",
+        "GET /orders/42 twice: the same response."
+      ],
+      "non_examples": [
+        "POST /orders with different bodies: two orders.",
+        "DELETE then POST of the same order: two operations.",
+        "POST /orders twice a day apart with the same body: two orders."
+      ]
+    }
+  },
+  "termverdicts": [
+    {
+      "examples": [true, true, true],
+      "non_examples": [false, false, true],
+      "note": "Two orders from the same body is the bug I want to prevent, key or not."
+    }
+  ]
+}

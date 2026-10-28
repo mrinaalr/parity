@@ -30,6 +30,24 @@ Shared understanding in conversation is something partners work to establish, an
 
 The name comes from the parity check in error-detecting codes [[3]](#ref-3): a small summary sent beside a message so the receiver can detect corruption without the message being resent. The analogy is loose, and the card plays that role.
 
+## Try it
+
+Needs Node 20 or newer.
+
+```bash
+git clone https://github.com/mrinaalr/parity.git && cd parity/engine
+npm install && npm run build && npm link
+```
+
+```bash
+parity               # you: prints a pairing code
+parity join <code>   # your partner, on their machine
+```
+
+Your agent drafts a card from your notes. You approve it. Their agent restates it. You grade the restatement. When every field reads right, both terminals say `synced`. Nothing leaves either machine but what you approved.
+
+No partner yet? `npm run demo` plays a full round between two scripted parties. Details in [engine/](engine/).
+
 ## Protocol
 
 ```
@@ -58,11 +76,21 @@ card:
 
 ## An information-theoretic view
 
-Treat the exchange as a noisy channel [[4]](#ref-4). Party $A$ encodes a position into a card $m$. Party $B$'s agent decodes the card into a restatement $\hat m$. Misreading is channel noise, and a poorly written card is encoder error.
+Treat the exchange as a noisy channel [[4]](#ref-4). Party $A$ holds a position $p$ and encodes it into a card $m$. The agent beside party $B$ decodes the card into a restatement $\hat p$. The chain is $p \to m \to \hat p$, and each arrow can lose information: a card that does not pin down the position is a lossy encoder, and a misreading is channel noise.
 
-Teach-back returns $\hat m$ to the sender, who compares the restatement with $m$. A mismatch is a detected error. The quantity to keep high is the mutual information $I(m;\hat m)$ between the card and its restatement.
+Teach-back returns $\hat p$ to the sender, who compares the restatement with the position they meant, not with the text of the card. A mismatch is a detected error. The quantity to keep high is the mutual information $I(p;\hat p)$ between the position and its restatement. The quantity to keep low is the equivocation $H(p \mid \hat p) = H(p) - I(p;\hat p)$, the uncertainty about the position that survives the restatement [[4]](#ref-4).
 
-Examples and non-examples repeat one meaning in several forms. Redundancy of this kind is what makes errors detectable in a code [[3]](#ref-3).
+Because $p \to m \to \hat p$ is a Markov chain, the data processing inequality gives
+
+$$
+I(p;\hat p) \le \min\left(I(p;m), I(m;\hat p)\right).
+$$
+
+The card caps what any reader can recover, and the reader caps what survives from the card. Comparing the restatement with the card alone is therefore not enough: $I(m;\hat p)$ can be high when the card carried little of the position, so a faithful restatement of a vague card passes while the position is lost.
+
+Examples and non-examples repeat one meaning in several forms. Redundancy of this kind is what makes errors detectable in a code [[3]](#ref-3), and here it raises $I(p;m)$, the first bound, by pinning each term to cases.
+
+The position $p$ is never observed directly. The author's grade is the proxy for the comparison, which is why the analogy is loose and why grading is a human act.
 
 ## A game-theoretic view
 
@@ -123,6 +151,8 @@ Generate pairs of agent-assisted parties with a planted misunderstanding, then m
 3. False alarm rate on pairs with no planted difference.
 4. Information leaked through approved cards, scored against a held-out set of private facts.
 
+The engine's scripted adapter, in-memory channel, and scorer are the pieces a harness needs. The harness, the plants, and the raters are not written.
+
 ## Open questions
 
 - How short can a card be before the card stops catching drift?
@@ -132,7 +162,7 @@ Generate pairs of agent-assisted parties with a planted misunderstanding, then m
 
 ## Status
 
-Sketch only. This repository holds the protocol, the model, and the privacy design, with no implementation yet. [docs/architecture.md](docs/architecture.md) describes the components and data flow. References support individual statements. This sketch makes no claim of novelty and no comparison to other work.
+The protocol, the model, and the privacy design are sketched here and in [docs/architecture.md](docs/architecture.md). [engine/](engine/) implements them in TypeScript: the card schema, an append-only channel that checks every hash and approval, an HTTP relay that runs inside the CLI, Claude, manual, and scripted agent adapters, the privacy lint, the approval gate, the scorer, the scheduler, and the two-party session loop. [docs/engine.md](docs/engine.md) is the design the code follows. Not built: the benchmark harness, a git-backed channel, the Claude Code mod, and more than two parties. References support individual statements. This repository makes no claim of novelty and no comparison to other work.
 
 ## License
 

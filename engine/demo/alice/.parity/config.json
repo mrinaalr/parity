@@ -1,0 +1,5 @@
+{
+  "name": "alice",
+  "adapter": "scripted",
+  "denylist": ["ACME-INTERNAL"]
+}

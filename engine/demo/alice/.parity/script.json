@@ -1,0 +1,84 @@
+{
+  "cards": [
+    {
+      "problem": "Clients retry failed POST /orders calls and sometimes create duplicate orders.",
+      "decision": "Require an Idempotency-Key header on POST /orders and store the first response for 24 hours under that key.",
+      "constraints": [
+        "Keys are scoped per client account.",
+        "The stored response is returned byte for byte on a repeat with the same key.",
+        "No change to the GET endpoints."
+      ],
+      "acceptance": [
+        "Two POSTs with the same key within 24 hours create one order.",
+        "A POST with a reused key but a different body returns 422.",
+        "Load test shows under 5 ms added p99 latency."
+      ],
+      "evidence": [
+        { "summary": "Duplicate orders in last month's incident review.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+      ],
+      "key_terms": {
+        "idempotent": { "definition": "A request is idempotent when repeating it with the same Idempotency-Key produces the same result and no new side effect." },
+        "retry": { "definition": "A client resending a request after a timeout or 5xx, with the same key." }
+      },
+      "would_change_my_mind": "Evidence that clients cannot reliably generate and persist a key across a crash."
+    },
+    {
+      "problem": "Clients retry failed POST /orders calls and sometimes create duplicate orders.",
+      "decision": "Require an Idempotency-Key header on POST /orders and store the first response for 24 hours under that key.",
+      "constraints": [
+        "Keys are scoped per client account.",
+        "The stored response is returned byte for byte on a repeat with the same key.",
+        "No change to the GET endpoints."
+      ],
+      "acceptance": [
+        "Two POSTs with the same key within 24 hours create one order.",
+        "A POST with a reused key but a different body returns 422.",
+        "Load test shows under 5 ms added p99 latency."
+      ],
+      "evidence": [
+        { "summary": "Duplicate orders in last month's incident review.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+      ],
+      "key_terms": {
+        "idempotent": { "definition": "A request is idempotent when the same client account resends it with the same Idempotency-Key and receives the stored first response instead of a new order; a repeat with no key or a different key is a new request." },
+        "retry": { "definition": "A client resending a request after a timeout or 5xx, with the same key." }
+      },
+      "would_change_my_mind": "Evidence that clients cannot reliably generate and persist a key across a crash."
+    }
+  ],
+  "teachbacks": "echo",
+  "termchecks": {
+    "idempotent": {
+      "examples": [
+        "POST /orders twice with key K and the same body: one order.",
+        "POST /orders with key K, then again with key K after a timeout: the stored response is returned.",
+        "PUT /orders/42 with the same body twice: one update."
+      ],
+      "non_examples": [
+        "POST /orders twice with no key: two orders.",
+        "POST /orders with key K then key K2 and the same body: two orders.",
+        "POST /orders with key K and a different body: rejected, not deduplicated."
+      ]
+    }
+  },
+  "grades": [
+    {
+      "overall": "partly",
+      "fields": { "problem": "right", "decision": "right", "constraints": "right", "acceptance": "right", "evidence": "right", "key_terms": "partly", "would_change_my_mind": "right" },
+      "terms": { "idempotent": "partly", "retry": "right" },
+      "note": "The restatement drops the same-key condition from idempotent."
+    },
+    {
+      "overall": "right",
+      "fields": { "problem": "right", "decision": "right", "constraints": "right", "acceptance": "right", "evidence": "right", "key_terms": "right", "would_change_my_mind": "right" },
+      "terms": { "idempotent": "right", "retry": "right" },
+      "note": ""
+    }
+  ],
+  "termverdicts": [
+    {
+      "examples": [false, false, true],
+      "non_examples": [true, true, true],
+      "note": "Without a key, a repeated body is two orders under my definition."
+    }
+  ]
+}
