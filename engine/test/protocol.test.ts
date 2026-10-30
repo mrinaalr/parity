@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Mrinaal Ramachandran
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // Runs the two demo scripts over an in-memory channel and checks the whole round.
 
 import assert from 'node:assert/strict';
@@ -52,14 +68,14 @@ test('the demo pair detects the term mismatch, runs a term check, revises, and e
   const firstGrade = log.findIndex((e) => e.kind === 'grade');
   const mid = deriveState(log.slice(0, firstGrade + 1), 'alice');
   assert.equal(mid.status, 'mismatch');
-  assert.match(mid.detail, /term "idempotent"/);
+  assert.match(mid.detail, /term "delete"/);
 
   const sa = score(log, 'alice');
   assert.equal(sa.rounds, 2);
   assert.equal(sa.latestFidelity, 1);
   assert.ok(sa.drift > 0, 'fidelity rose after the revision');
-  assert.equal(sa.terms.idempotent.mismatched, false);
-  assert.ok(sa.terms.idempotent.acceptance < 1);
+  assert.equal(sa.terms.delete.mismatched, false);
+  assert.ok(sa.terms.delete.acceptance < 1);
 
   // the two cards still disagree on the decision, and that is allowed
   assert.notEqual(a.latestCards.alice.body.decision, a.latestCards.bob.body.decision);

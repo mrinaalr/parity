@@ -48,6 +48,32 @@ Your agent drafts a card from your notes. You approve it. Their agent restates i
 
 No partner yet? `npm run demo` plays a full round between two scripted parties. Details in [engine/](engine/).
 
+### Inside Claude Code
+
+Claude Code can split one task across a team of agents. The people steering them still have to mean the same thing. Parity runs inside Claude Code and checks that they do, at the moment the work splits.
+
+```
+/plugin marketplace add mrinaalr/parity
+/plugin install parity@parity
+```
+
+In any project where you have run `parity`, four things happen.
+
+1. **A band above the prompt** reads `synced`, `pending`, or the term that drifted: `parity · "delete" read differently`.
+2. **`/parity`** shows what the author meant next to what the reader took away, with the dropped words marked.
+3. **Every agent reads the shared reading.** The approved cards, and any drift, go into Claude's system prompt and into the brief of every agent it spawns. Claude names the drift instead of quietly taking the reading of whoever is typing.
+4. **Handoffs wait.** Spawning a teammate, opening a pull request, pushing, and merging are held until both sides have read each other. `ask` mode lets the person go ahead anyway.
+
+`synced` means each party restated the other's card correctly. It does not mean they agree.
+
+See it in thirty seconds, no partner needed:
+
+```bash
+cd claude-code/demo-fixture && claude --plugin-dir ..
+```
+
+Then type `/parity`, or ask Claude to push. Details in [docs/claude-code.md](docs/claude-code.md).
+
 ## Protocol
 
 ```
@@ -73,6 +99,8 @@ card:
   would_change_my_mind: one sentence
   status:       draft | approved
 ```
+
+The engine uses the engineering form of this card: `decision` in place of `claim`, plus `constraints` and `acceptance`, and a one-sentence definition per term. [docs/engine.md](docs/engine.md) has it.
 
 ## An information-theoretic view
 
@@ -139,6 +167,7 @@ Residual risks: an approved card may reveal more than intended, and an agent sum
 - **Research collaboration.** Two authors confirm they hold the same problem statement before dividing the work.
 - **Peer review.** A reviewer's agent restates a paper's claim, the author confirms or corrects the restatement, and the review proceeds from a shared reading. The reviewer can ask "is this what you mean?" and get an answer in one round.
 - **Advising and mentoring.** A student and advisor check, at fixed intervals, that both still describe the project the same way.
+- **Engineering handoffs.** Before a team splits a feature across people and agents, both sides confirm they read the decision the same way. In Claude Code the check sits on the handoff itself: the teammate spawn, the pull request, the push.
 
 The protocol also works one-sided: a party can send a card to someone who is not using Parity and read their plain-text reaction as the teach-back.
 
@@ -162,7 +191,7 @@ The engine's scripted adapter, in-memory channel, and scorer are the pieces a ha
 
 ## Status
 
-The protocol, the model, and the privacy design are sketched here and in [docs/architecture.md](docs/architecture.md). [engine/](engine/) implements them in TypeScript: the card schema, an append-only channel that checks every hash and approval, an HTTP relay that runs inside the CLI, Claude, manual, and scripted agent adapters, the privacy lint, the approval gate, the scorer, the scheduler, and the two-party session loop. [docs/engine.md](docs/engine.md) is the design the code follows. Not built: the benchmark harness, a git-backed channel, the Claude Code mod, and more than two parties. References support individual statements. This repository makes no claim of novelty and no comparison to other work.
+The protocol, the model, and the privacy design are sketched here and in [docs/architecture.md](docs/architecture.md). [engine/](engine/) implements them in TypeScript: the card schema, an append-only channel that checks every hash and approval, an HTTP relay that runs inside the CLI, Claude, manual, and scripted agent adapters, the privacy lint, the approval gate, the scorer, the scheduler, the two-party session loop, and `parity check` for CI and git hooks. [docs/engine.md](docs/engine.md) is the design the code follows. [claude-code/](claude-code/) is the Claude Code mod. Not built: the benchmark harness, a git-backed channel, grading a round from inside Claude Code, and more than two parties. References support individual statements. [docs/related-work.md](docs/related-work.md) credits the work Parity builds on.
 
 ## License
 

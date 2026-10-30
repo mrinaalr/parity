@@ -1,84 +1,124 @@
 {
   "cards": [
     {
-      "problem": "Clients retry failed POST /orders calls and sometimes create duplicate orders.",
-      "decision": "Require an Idempotency-Key header on POST /orders and store the first response for 24 hours under that key.",
+      "problem": "People who close their account keep getting our email, and support deletes accounts by hand.",
+      "decision": "Add a Delete account button that erases the person's personal data within 24 hours and keeps their orders under an anonymous customer id.",
       "constraints": [
-        "Keys are scoped per client account.",
-        "The stored response is returned byte for byte on a repeat with the same key.",
-        "No change to the GET endpoints."
+        "Order history stays, for tax records and refunds.",
+        "Guest checkout does not change."
       ],
       "acceptance": [
-        "Two POSTs with the same key within 24 hours create one order.",
-        "A POST with a reused key but a different body returns 422.",
-        "Load test shows under 5 ms added p99 latency."
+        "A deleted person's name, email, and address appear in no service.",
+        "Last quarter's revenue report gives the same total before and after a deletion."
       ],
       "evidence": [
-        { "summary": "Duplicate orders in last month's incident review.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+        {
+          "summary": "Support handled 41 account deletions by hand last month.",
+          "pointer": "support/macros/delete-account.md"
+        }
       ],
       "key_terms": {
-        "idempotent": { "definition": "A request is idempotent when repeating it with the same Idempotency-Key produces the same result and no new side effect." },
-        "retry": { "definition": "A client resending a request after a timeout or 5xx, with the same key." }
+        "delete": {
+          "definition": "Deleting an account removes the person's personal data and keeps their order history."
+        },
+        "personal data": {
+          "definition": "The name, email, phone number, and addresses tied to a person's account."
+        }
       },
-      "would_change_my_mind": "Evidence that clients cannot reliably generate and persist a key across a crash."
+      "would_change_my_mind": "Legal telling us order history counts as personal data we must erase."
     },
     {
-      "problem": "Clients retry failed POST /orders calls and sometimes create duplicate orders.",
-      "decision": "Require an Idempotency-Key header on POST /orders and store the first response for 24 hours under that key.",
+      "problem": "People who close their account keep getting our email, and support deletes accounts by hand.",
+      "decision": "Add a Delete account button that erases the person's personal data within 24 hours and keeps their orders under an anonymous customer id.",
       "constraints": [
-        "Keys are scoped per client account.",
-        "The stored response is returned byte for byte on a repeat with the same key.",
-        "No change to the GET endpoints."
+        "Order history stays, for tax records and refunds.",
+        "Guest checkout does not change."
       ],
       "acceptance": [
-        "Two POSTs with the same key within 24 hours create one order.",
-        "A POST with a reused key but a different body returns 422.",
-        "Load test shows under 5 ms added p99 latency."
+        "A deleted person's name, email, and address appear in no service.",
+        "Last quarter's revenue report gives the same total before and after a deletion."
       ],
       "evidence": [
-        { "summary": "Duplicate orders in last month's incident review.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+        {
+          "summary": "Support handled 41 account deletions by hand last month.",
+          "pointer": "support/macros/delete-account.md"
+        }
       ],
       "key_terms": {
-        "idempotent": { "definition": "A request is idempotent when the same client account resends it with the same Idempotency-Key and receives the stored first response instead of a new order; a repeat with no key or a different key is a new request." },
-        "retry": { "definition": "A client resending a request after a timeout or 5xx, with the same key." }
+        "delete": {
+          "definition": "Deleting an account erases the person's name, email, phone, and addresses from every service and keeps their orders under an anonymous customer id; nothing that identifies them is left."
+        },
+        "personal data": {
+          "definition": "The name, email, phone number, and addresses tied to a person's account."
+        }
       },
-      "would_change_my_mind": "Evidence that clients cannot reliably generate and persist a key across a crash."
+      "would_change_my_mind": "Legal telling us order history counts as personal data we must erase."
     }
   ],
   "teachbacks": "echo",
   "termchecks": {
-    "idempotent": {
+    "delete": {
       "examples": [
-        "POST /orders twice with key K and the same body: one order.",
-        "POST /orders with key K, then again with key K after a timeout: the stored response is returned.",
-        "PUT /orders/42 with the same body twice: one update."
+        "The person's name and email are erased from the user, mailing, and support services.",
+        "Their saved addresses are erased.",
+        "Their past orders stay, under an anonymous customer id."
       ],
       "non_examples": [
-        "POST /orders twice with no key: two orders.",
-        "POST /orders with key K then key K2 and the same body: two orders.",
-        "POST /orders with key K and a different body: rejected, not deduplicated."
+        "Their orders are removed from last quarter's revenue report.",
+        "The account is marked inactive and keeps the email.",
+        "Their invoices are erased from the tax records."
       ]
     }
   },
   "grades": [
     {
       "overall": "partly",
-      "fields": { "problem": "right", "decision": "right", "constraints": "right", "acceptance": "right", "evidence": "right", "key_terms": "partly", "would_change_my_mind": "right" },
-      "terms": { "idempotent": "partly", "retry": "right" },
-      "note": "The restatement drops the same-key condition from idempotent."
+      "fields": {
+        "problem": "right",
+        "decision": "right",
+        "constraints": "right",
+        "acceptance": "right",
+        "evidence": "right",
+        "key_terms": "partly",
+        "would_change_my_mind": "right"
+      },
+      "terms": {
+        "delete": "partly",
+        "personal data": "right"
+      },
+      "note": "The restatement drops that order history stays."
     },
     {
       "overall": "right",
-      "fields": { "problem": "right", "decision": "right", "constraints": "right", "acceptance": "right", "evidence": "right", "key_terms": "right", "would_change_my_mind": "right" },
-      "terms": { "idempotent": "right", "retry": "right" },
+      "fields": {
+        "problem": "right",
+        "decision": "right",
+        "constraints": "right",
+        "acceptance": "right",
+        "evidence": "right",
+        "key_terms": "right",
+        "would_change_my_mind": "right"
+      },
+      "terms": {
+        "delete": "right",
+        "personal data": "right"
+      },
       "note": ""
     }
   ],
   "termverdicts": [
     {
-      "examples": [false, false, true],
-      "non_examples": [true, true, true],
-      "note": "Without a key, a repeated body is two orders under my definition."
+      "examples": [
+        true,
+        false,
+        true
+      ],
+      "non_examples": [
+        true,
+        true,
+        false
+      ],
+      "note": "Orders stay under my definition; only what identifies the person goes."
     }
   ]
 }

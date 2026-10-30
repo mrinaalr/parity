@@ -1,0 +1,6 @@
+{
+  "name": "alice",
+  "gateMode": "ask",
+  "gateTeammates": true,
+  "gateBash": true
+}

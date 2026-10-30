@@ -16,7 +16,7 @@ Both sides draft a card, restate the other's, grade the restatement, and check a
 npm run demo
 ```
 
-Runs Alice and Bob from `demo/` in one process over a real HTTP relay, with scripted agents and auto-approval. Bob's restatement drops a condition from Alice's definition of `idempotent`, the grade names the term, both give examples, Alice revises, and the pair ends synced while still holding different decisions.
+Runs Alice and Bob from `demo/` in one process over a real HTTP relay, with scripted agents and auto-approval. Bob's restatement drops half of Alice's definition of `delete`, the grade names the term, both give examples, Alice revises, and the pair ends synced while still holding different decisions.
 
 Two terminals, same thing:
 
@@ -33,10 +33,13 @@ cd demo/bob   && npx tsx ../../src/cli.ts join <code> --yes
 | `parity join <code>` | join a partner's relay, enter the loop |
 | `parity serve` | run only the relay |
 | `parity status` | sync status and your next action, from the local log copy |
+| `parity check` | machine-readable status; exit `0` synced, `1` not, `2` no config (`--json`) |
 | `parity log` | the log, one line per entry |
 | `parity card <code>` | draft a new card now |
 
-Flags: `--adapter claude|scripted|manual`, `--gate editor|inline|auto`, `--yes` (auto gate, agent grades), `--port N`, `--name X`, `--local` (bind 127.0.0.1).
+Flags: `--adapter claude|scripted|manual`, `--gate editor|inline|auto`, `--yes` (auto gate, agent grades), `--port N`, `--name X`, `--local` (bind 127.0.0.1), `--json`.
+
+Claude Code mod (band, pane, handoff gates): [../claude-code/](../claude-code/) · [docs/claude-code.md](../docs/claude-code.md).
 
 ## How a party is set up
 

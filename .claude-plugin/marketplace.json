@@ -1,0 +1,21 @@
+{
+  "name": "parity",
+  "owner": {
+    "name": "Mrinaal Ramachandran"
+  },
+  "metadata": {
+    "description": "Parity: check that two people and their agents are on the same page before the work splits",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "parity",
+      "source": "./claude-code",
+      "description": "Band, pane, and handoff gates for the Parity protocol. Verify understanding, never process.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Mrinaal Ramachandran"
+      }
+    }
+  ]
+}

@@ -1,17 +1,16 @@
 # Architecture
 
-Sketch only. No component described here is implemented.
+Parity has six components and a Claude Code mod. Five components run on each party's machine. One, the channel, sits between the two machines and holds everything that crosses. The mod reads only what already crossed, the local copy of the log, and never local context.
 
-Parity has six components. Five run on each party's machine. One, the channel, sits between the two machines and holds everything that crosses.
-
-| Component | Runs where | Role |
-|---|---|---|
-| Agent adapter | local | Drafts cards and restatements from local context |
-| Approval gate | local | Blocks any object from leaving until a human approves the object |
-| Channel | between parties | Append-only log of cards, teach-backs, and grades |
-| Alignment scorer | local | Scores restatement fidelity and term-check outcomes |
-| Resync scheduler | local | Decides when the next card is due |
-| Privacy boundary | local | Lints a draft against local context before the approval gate |
+| Component | Runs where | Role | Status |
+|---|---|---|---|
+| Agent adapter | local | Drafts cards and restatements from local context | implemented (`engine/src/adapter/`) |
+| Approval gate | local | Blocks any object from leaving until a human approves the object | implemented (`gate.ts`) |
+| Channel | between parties | Append-only log of cards, teach-backs, grades, term checks | implemented (memory + HTTP relay; git not built) |
+| Alignment scorer | local | Scores restatement fidelity and term-check outcomes | implemented (`scorer.ts`) |
+| Resync scheduler | local | Decides when the next card is due | implemented (`scheduler.ts`) |
+| Privacy boundary | local | Lints a draft against local context before the approval gate | implemented (`lint.ts`) |
+| Claude Code mod | local | Shows sync status, grounds every agent in the approved cards, holds handoffs until synced | implemented (`claude-code/`) |
 
 ## Data flow
 
@@ -24,6 +23,7 @@ flowchart LR
     gateA{approval gate}
     scA[alignment scorer]
     rsA[resync scheduler]
+    modA[Claude Code mod]
   end
   subgraph CH["Channel (append-only log)"]
     log[[cards, teach-backs, grades]]
@@ -34,6 +34,7 @@ flowchart LR
     pbB[privacy lint]
     gateB{approval gate}
     scB[alignment scorer]
+    modB[Claude Code mod]
   end
   actxA --> adA --> pbA --> gateA -->|card| log
   log -->|card| adB --> pbB --> gateB -->|teach-back| log
@@ -42,11 +43,13 @@ flowchart LR
   log --> scB
   scA --> rsA --> adA
   actxB --> adB
+  log -.-> modA
+  log -.-> modB
 ```
 
 One round, in order:
 
-1. The resync scheduler on A's side signals that a card is due.
+1. The resync scheduler on A's side signals that a card is due, or a person types `parity card`.
 2. A's agent adapter drafts a card from A's local context.
 3. A's privacy lint flags any string in the draft that also appears in local context outside the evidence pointers.
 4. A edits the draft and approves the card at the approval gate. Only an approved card reaches the channel.
@@ -54,7 +57,7 @@ One round, in order:
 6. B's agent adapter reads the card and drafts a teach-back. B's privacy lint and approval gate run on the teach-back the same way.
 7. The channel appends the teach-back.
 8. A grades the teach-back as right, partly right, or wrong, with a per-term grade for each key term. The channel appends the grade.
-9. Both alignment scorers read the log and update the alignment score for the pair.
+9. Both alignment scorers read the log and update the alignment score for the pair. Both Claude Code mods read the new entries.
 10. For any term graded partly right or wrong, both parties run a term check, and the round repeats with a revised card.
 
 ## Components
@@ -66,54 +69,39 @@ The adapter is the only component that reads a party's prompts, transcripts, and
 - `draft_card(context) -> card` with `status: draft`.
 - `draft_teachback(card, context) -> teachback` with `status: draft`.
 
-The adapter is model-agnostic. Any local model, hosted model, or human can fill the role. The adapter never writes to the channel.
+The adapter is model-agnostic. Implementations: Claude API, scripted (demo/tests), manual (`$EDITOR`). The adapter never writes to the channel.
 
 ### Approval gate
 
-The gate holds every draft until the owning human marks the draft approved. The gate presents the draft, the privacy lint findings, and a diff against the previous approved card from the same party. Approval flips `status` to `approved` and records a hash of the approved text. Nothing reaches the channel without an approval record, and the channel rejects any object whose hash does not match an approval record.
-
-The gate is a human step by design. An agent may propose edits, and the human makes the final change.
+The gate holds every draft until the owning human marks the draft approved. The gate presents the draft, the privacy lint findings, and a diff against the previous approved card from the same party. Approval records a hash of the approved text. Nothing reaches the channel without an approval record, and the channel rejects any object whose hash does not match an approval record.
 
 ### Channel
 
-The channel is an append-only log. Entries are never edited or deleted. Each entry is one of three kinds.
+The channel is an append-only log. Entries are never edited or deleted. Each entry is one of: `card`, `teachback`, `grade`, `termcheck`, `termverdict`. Each carries an author, a timestamp, a sequence number, content id, reference id, and approval hash. Transport: in-memory (tests), HTTP relay inside the CLI (default), git-backed (not built).
 
-| Kind | Author | Refers to |
-|---|---|---|
-| `card` | one party | the previous card from the same party, if any |
-| `teachback` | the other party | one card |
-| `grade` | the card's author | one teach-back |
-
-Each entry carries an author, a timestamp, a sequence number, the hash of the entry the entry refers to, and the approval hash. The channel is transport-agnostic: a shared file, an email thread, a git branch, or a message queue all serve. The sketch uses a simulated channel, which is a single JSON Lines file that both simulated parties append to in turn.
+Every client re-verifies every entry it receives (`rules.ts`), so a dishonest relay cannot slip an unapproved or altered entry past either party.
 
 ### Alignment scorer
 
-The scorer reads only the channel and produces two numbers per round.
-
-- **Restatement fidelity.** The fraction of card fields the author graded right, weighted so that `claim` and `key_terms` count double. A teach-back graded wrong on `claim` scores zero regardless of the other fields.
-- **Term-check outcome.** For each key term, the fraction of the other party's examples and non-examples that the term's author accepts. A term with acceptance below a threshold is marked mismatched.
-
-The scorer also emits a drift estimate: the change in fidelity between consecutive rounds. The scorer never reads local context, so both parties can run the scorer and get the same numbers.
+The scorer reads only the channel and produces restatement fidelity (weighted fields; wrong on `decision` scores zero), term acceptance, and drift between rounds. Both parties run it on the same log and get the same numbers.
 
 ### Resync scheduler
 
-The scheduler decides when the next card is due. Inputs are the drift estimate from the scorer, the number of turns since the last approved card, and two constants the party sets: a resync cost `c` and a misalignment price `k`. The scheduler issues a card request when the cumulative expected misalignment since the last resync exceeds `c`, or when a fixed maximum interval passes, whichever comes first. The expected misalignment follows the drift model in the README. The scheduler never sends anything on a party's behalf.
+Inputs: drift estimate, turns since last card, cost `c`, misalignment price `k`, max interval. Issues a card request when cumulative expected misalignment exceeds `c`, or the max interval passes. Never sends on a party's behalf.
 
 ### Privacy boundary
 
-The boundary wraps the adapter and the gate. Two rules hold.
+Local context is readable only by the adapter and the lint. Only objects with an approval record cross. The pre-send lint: denylist + verbatim context scan (eight or more consecutive words). Marks, never removes. Paraphrased leaks remain a human responsibility, as the threat model below says.
 
-1. Local context is readable only by the adapter and the lint.
-2. Only objects with an approval record cross the boundary.
+### Claude Code mod
 
-The pre-send lint runs on every draft before the gate shows the draft to the human. The lint has a denylist and a context scan.
-
-- **Denylist.** Strings the party registers in advance: names, project codenames, file paths, credentials, unreleased numbers.
-- **Context scan.** Every span of the draft longer than a set length that matches a span in local context verbatim. Evidence pointers are exempt, since a pointer is meant to name a source.
-
-The lint marks, and never removes. The human sees each flagged span with the matching source and decides. Approval with open flags is allowed and recorded as such.
+Reads `.parity/config.json` and `.parity/log.jsonl`, nothing else. Shows status above the prompt and in a `/parity` pane. Adds the approved cards, and any drifted term with both readings, to Claude's system prompt and to the brief of every spawned agent. Holds agent-team teammate spawns, pull requests, pushes, and merges until synced, as `gateMode` says. Details in [claude-code.md](claude-code.md).
 
 ## Card schema
+
+Engineering card (engine): `problem`, `decision`, `constraints`, `acceptance`, `evidence`, `key_terms` (definition + optional examples), `would_change_my_mind`. Research card in the README uses `claim` in place of `decision` and omits constraints/acceptance. Teach-backs reuse the card shape. Grades: overall + per field + per term + one-sentence note.
+
+Full JSON Schema sketch remains below for the research-shaped card; the engine enforces the engineering shape in `schema.ts`.
 
 ```json
 {
@@ -177,36 +165,28 @@ The lint marks, and never removes. The human sees each flagged span with the mat
 }
 ```
 
-Teach-backs reuse the card schema with `author` set to the other party and `previous` set to the card id. Grades are a separate object: `{ "teachback": id, "overall": "right" | "partly" | "wrong", "terms": { term: "right" | "partly" | "wrong" } }`.
-
 ## Threat model
 
 ### What crosses the channel
 
-Approved cards, approved teach-backs, and grades. Each carries an author, a timestamp, a sequence number, hashes, and the text of the fixed fields. Nothing else crosses. Prompts, transcripts, working files, and the agent's own reasoning stay local.
+Approved cards, approved teach-backs, grades, term checks, and term verdicts. Prompts, transcripts, working files, and the agent's own reasoning stay local.
 
 ### What a malicious or careless counterparty can extract
 
-- **Everything in an approved card.** The counterparty reads the card in full. A card that names a method, a dataset, or a result discloses that method, dataset, or result. The schema bounds the size of a disclosure, not the sensitivity.
-- **Position over time.** The log keeps every card. A reader can diff consecutive cards and watch a position change, which reveals what moved the author.
-- **Terms and examples.** Examples and non-examples are chosen from the author's experience. A careless author picks examples from unreleased work.
-- **Agent behavior.** Teach-backs show how the counterparty's agent reads. A reader can probe the agent by sending crafted cards and watching restatements.
-- **Metadata.** Timestamps and sequence numbers reveal working hours and response latency.
+Everything in an approved card; position over time via the log; terms and examples; teach-back style as a probe of the other agent; metadata (timestamps, latency).
 
 ### What the counterparty cannot extract
 
-Local context, by construction: the adapter reads local context, and only approved objects leave. A counterparty who controls the channel transport sees the same log as both parties and nothing more.
+Local context, by construction.
 
 ### What the approval gate stops
 
-- Any object leaving without a human reading the object first.
-- Any object that differs from the text the human approved, since the channel checks the approval hash.
-- Verbatim leaks that the lint catches: denylisted strings and long spans copied from local context.
+Unapproved egress; altered bodies (approval hash); verbatim denylist and long context-span leaks the lint catches.
 
 ### What the approval gate does not stop
 
-- **Paraphrased leaks.** The lint matches strings. An agent that rewords a private fact passes the lint, and only the human can catch the reworded fact.
-- **Approval fatigue.** A human who approves without reading turns the gate into a pass-through. The gate records approval time and open flags, which lets a later audit find rubber stamping, and stops nothing in the moment.
-- **A dishonest party.** Nothing forces a party to approve a card that states their real position. The protocol detects misunderstanding between stated positions, and a stated position can be false.
-- **Agent distortion that the human agrees with.** An agent that softens a position in a way the author finds agreeable passes the gate. Sycophancy on the author's own side is the residual risk the README names.
-- **Inference from the log.** Everything in the previous section is available to any reader of the log, and the gate does not reason about what a counterparty can infer.
+Paraphrased leaks; approval fatigue; a dishonest stated position; own-side sycophancy the author agrees with; inference from the public log.
+
+### What the Claude Code mod adds
+
+A hold at the handoff, and agents that know what each person approved. No new data surface: the mod reads only the local copy of the log, which holds only entries their authors approved. With `gateMode: off` the mod still shows status and grounds agents, and holds nothing.

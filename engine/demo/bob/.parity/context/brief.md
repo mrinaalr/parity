@@ -1,9 +1,9 @@
-# Bob's private brief: order retries
+# Bob's private brief: deleting accounts
 
-The September incident was a retry storm from one mobile client version. Hundreds of identical POST /orders bodies hit the service within seconds and most became separate orders.
+The August audit turned up one closed account's details in six systems. Cleanup is manual, and each system does it its own way.
 
-My plan: hash the request body on POST /orders and drop any repeat seen in the last ten minutes. No client change needed, which matters because the mobile release train is six weeks.
+My plan: a single job that hard deletes anything carrying the account id, everywhere, once a 30-day undo period ends. Easy to reason about and easy to audit.
 
-When I say a request is idempotent I mean: sending it again, from any client and with no special header, cannot create a second order. The server owns this; clients should not have to carry a key.
+To me, delete means the account is gone along with everything attached to it. A row with that id goes.
 
-Private, not for the card: I think Alice's header plan is right long term and mine is the stopgap, but I have not said that yet.
+Private, not for the card: I have not asked finance whether orders can go. I am assuming yes.

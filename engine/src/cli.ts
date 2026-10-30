@@ -1,8 +1,25 @@
 #!/usr/bin/env node
+/*
+ * Copyright 2026 Mrinaal Ramachandran
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // parity               start: run the relay, print the pairing code, enter the loop
 // parity join <code>   join a partner's relay, enter the loop
 // parity serve         run only the relay
 // parity status        print sync status and the next action
+// parity check         machine-readable status for hooks and the Claude Code mod
 // parity card          draft a new card now
 // parity log           print the log, one line per entry
 
@@ -17,6 +34,7 @@ import { ScriptedAdapter } from './adapter/scripted.js';
 import type { Channel } from './channel/channel.js';
 import { HttpChannel } from './channel/http-client.js';
 import { startRelay } from './channel/http-server.js';
+import { checkReport } from './check.js';
 import { hasEditor } from './editor.js';
 import { AutoGate, EditorGate, InlineGate, type Gate } from './gate.js';
 import { DEFAULT_SCHEDULE, resyncDue } from './scheduler.js';
@@ -210,6 +228,30 @@ async function main(): Promise<void> {
       console.log(render(deriveState(readLog(dir), cfg.name)));
       return;
     }
+    case 'check': {
+      // Exit codes: 0 synced, 1 not synced, 2 nothing to check (no config, no card, or a file that does not parse).
+      // JSON when asked or when stdout is not a terminal, so CI and git hooks can read it.
+      const asJson = Boolean(args.flags.json) || !stdout.isTTY;
+      let report: ReturnType<typeof checkReport> | undefined;
+      let problem = '';
+      try {
+        const cfg = readConfig(dir);
+        if (!cfg) problem = 'no .parity/config.json';
+        else report = checkReport(readLog(dir), cfg.name);
+      } catch (err) {
+        problem = `cannot read .parity/: ${(err as Error).message}`;
+      }
+      if (!report) {
+        if (asJson) console.log(JSON.stringify({ ok: false, synced: false, status: 'empty', detail: problem, exitCode: 2 }));
+        else console.error(`parity check: ${problem}`);
+        process.exitCode = 2;
+        return;
+      }
+      if (asJson) console.log(JSON.stringify(report, null, args.flags.json ? 2 : undefined));
+      else console.log(`parity: ${report.status}  ${report.detail}`);
+      process.exitCode = report.exitCode;
+      return;
+    }
     case 'log': {
       for (const e of readLog(dir)) console.log(`${String(e.seq).padStart(3)}  ${e.at}  ${e.author.padEnd(10)}  ${e.kind.padEnd(11)}  ${e.id.slice(0, 12)}  ->  ${e.refers?.slice(0, 12) ?? '-'}`);
       return;
@@ -236,7 +278,7 @@ async function main(): Promise<void> {
       return;
     }
     default:
-      console.log('usage: parity [start|join <code>|serve|status|log|card <code>] [--yes] [--adapter claude|scripted|manual] [--gate editor|inline|auto] [--port N] [--name X] [--dir path]');
+      console.log('usage: parity [start|join <code>|serve|status|check|log|card <code>] [--yes] [--adapter claude|scripted|manual] [--gate editor|inline|auto] [--port N] [--name X] [--dir path] [--json]');
   }
 }
 

@@ -1,0 +1,22 @@
+{
+  "name": "parity",
+  "displayName": "Parity",
+  "version": "0.1.0",
+  "description": "Shows whether two people and their agents read each other right, grounds every agent in the approved reading, and holds handoffs until they do. Verify understanding, never process.",
+  "author": {
+    "name": "Mrinaal Ramachandran",
+    "url": "https://github.com/mrinaalr/parity"
+  },
+  "homepage": "https://github.com/mrinaalr/parity/blob/main/docs/claude-code.md",
+  "repository": "https://github.com/mrinaalr/parity",
+  "license": "Apache-2.0",
+  "keywords": [
+    "parity",
+    "grounding",
+    "agent-teams",
+    "teach-back",
+    "collaboration",
+    "handoff"
+  ],
+  "types": "./types/index.d.ts"
+}

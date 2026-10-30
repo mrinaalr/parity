@@ -1,91 +1,116 @@
 {
   "cards": [
     {
-      "problem": "Retried POST /orders calls create duplicate orders.",
-      "decision": "Deduplicate POST /orders by hashing the request body and dropping any repeat seen in the last ten minutes.",
+      "problem": "Closed accounts leave personal data spread across six services, and support cleans it up by hand.",
+      "decision": "Hard delete every row tied to the account, orders included, after a 30-day undo window.",
       "constraints": [
-        "No client changes are required.",
-        "Dedup state lives in Redis with a ten minute TTL."
+        "Deletion is reversible for 30 days.",
+        "Every service deletes through one shared job."
       ],
       "acceptance": [
-        "Two identical POSTs within ten minutes create one order.",
-        "Identical POSTs eleven minutes apart create two orders."
+        "After 30 days no table holds a row with the account id.",
+        "Undo within 30 days restores the account exactly."
       ],
       "evidence": [
-        { "summary": "Retry storms in the September incident came from one mobile client version.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+        {
+          "summary": "Personal data for one closed account was found in six services during the last audit.",
+          "pointer": "docs/audits/2026-08-data-map.md"
+        }
       ],
       "key_terms": {
-        "idempotent": { "definition": "A request is idempotent when sending it again, from any client and with no special header, cannot create a second order." },
-        "retry storm": { "definition": "Many clients resending the same request within seconds after a timeout." }
+        "delete": {
+          "definition": "Deleting an account removes every row tied to it, in every service, after a 30-day undo window."
+        },
+        "undo window": {
+          "definition": "The 30 days during which a deleted account can be restored exactly."
+        }
       },
-      "would_change_my_mind": "Evidence that legitimate distinct orders often share an identical body within ten minutes."
+      "would_change_my_mind": "A regulator or finance telling us some records must outlive the account."
     }
   ],
   "teachbacks": [
     {
-      "problem": "Clients that retry a failed POST /orders can end up creating the same order twice.",
-      "decision": "Add an Idempotency-Key header to POST /orders and keep the first response for a day.",
+      "problem": "People who close their account still get our email, and support has to delete accounts manually.",
+      "decision": "Ship a Delete account button that clears the person's personal data within a day and keeps their orders under an anonymous id.",
       "constraints": [
-        "Keys belong to one client account.",
-        "A repeat gets back the exact stored response.",
-        "GET endpoints are untouched."
+        "Order history is kept for tax and refunds.",
+        "Guest checkout is untouched."
       ],
       "acceptance": [
-        "Posting twice with one key inside a day makes a single order.",
-        "Reusing a key with a changed body is rejected with 422.",
-        "p99 latency grows by less than 5 ms under load."
+        "No service shows a deleted person's name, email, or address.",
+        "The revenue report for last quarter does not change after a deletion."
       ],
       "evidence": [
-        { "summary": "Last month's incident review found duplicate orders.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+        {
+          "summary": "Last month support deleted 41 accounts manually.",
+          "pointer": "support/macros/delete-account.md"
+        }
       ],
       "key_terms": {
-        "idempotent": { "definition": "A request is idempotent when sending it again never creates a second order." },
-        "retry": { "definition": "A client sending a request again after a timeout or server error." }
+        "delete": {
+          "definition": "Deleting an account removes the account."
+        },
+        "personal data": {
+          "definition": "The name, email, phone, and addresses on someone's account."
+        }
       },
-      "would_change_my_mind": "Proof that clients cannot keep a key alive across a crash."
+      "would_change_my_mind": "Legal deciding that order history is personal data we have to erase."
     },
     {
-      "problem": "Clients that retry a failed POST /orders can end up creating the same order twice.",
-      "decision": "Add an Idempotency-Key header to POST /orders and keep the first response for a day.",
+      "problem": "People who close their account still get our email, and support has to delete accounts manually.",
+      "decision": "Ship a Delete account button that clears the person's personal data within a day and keeps their orders under an anonymous id.",
       "constraints": [
-        "Keys belong to one client account.",
-        "A repeat with the same key gets back the exact stored response.",
-        "GET endpoints are untouched."
+        "Order history is kept for tax and refunds.",
+        "Guest checkout is untouched."
       ],
       "acceptance": [
-        "Posting twice with one key inside a day makes a single order.",
-        "Reusing a key with a changed body is rejected with 422.",
-        "p99 latency grows by less than 5 ms under load."
+        "No service shows a deleted person's name, email, or address.",
+        "The revenue report for last quarter does not change after a deletion."
       ],
       "evidence": [
-        { "summary": "Last month's incident review found duplicate orders.", "pointer": "docs/incidents/2026-09-dup-orders.md" }
+        {
+          "summary": "Last month support deleted 41 accounts manually.",
+          "pointer": "support/macros/delete-account.md"
+        }
       ],
       "key_terms": {
-        "idempotent": { "definition": "A request is idempotent when the same account resends it with the same Idempotency-Key and gets the stored first response rather than a new order; no key or a new key means a new request." },
-        "retry": { "definition": "A client sending a request again, with the same key, after a timeout or server error." }
+        "delete": {
+          "definition": "Deleting an account erases everything that identifies the person, in every service, and keeps their orders under an anonymous customer id."
+        },
+        "personal data": {
+          "definition": "The name, email, phone, and addresses on someone's account."
+        }
       },
-      "would_change_my_mind": "Proof that clients cannot keep a key alive across a crash."
+      "would_change_my_mind": "Legal deciding that order history is personal data we have to erase."
     }
   ],
   "termchecks": {
-    "idempotent": {
+    "delete": {
       "examples": [
-        "POST /orders twice with the same body: one order.",
-        "POST /orders with the same body from two clients: one order.",
-        "GET /orders/42 twice: the same response."
+        "The account row is removed.",
+        "Every order tied to the account is removed.",
+        "The person can no longer sign in."
       ],
       "non_examples": [
-        "POST /orders with different bodies: two orders.",
-        "DELETE then POST of the same order: two operations.",
-        "POST /orders twice a day apart with the same body: two orders."
+        "The account is only disabled.",
+        "The person's email stays on a mailing list.",
+        "Their orders stay in the revenue report."
       ]
     }
   },
   "termverdicts": [
     {
-      "examples": [true, true, true],
-      "non_examples": [false, false, true],
-      "note": "Two orders from the same body is the bug I want to prevent, key or not."
+      "examples": [
+        true,
+        true,
+        false
+      ],
+      "non_examples": [
+        false,
+        true,
+        false
+      ],
+      "note": "Keeping their orders keeps a trace of them, and that is not what I call delete."
     }
   ]
 }

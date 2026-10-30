@@ -1,0 +1,4 @@
+{
+  "description": "Parity: band, pane, grounding, and handoff gates for Claude Code",
+  "modules": ["./register.tsx"]
+}

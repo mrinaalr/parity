@@ -194,7 +194,7 @@ Both parties post a term check for a mismatched term and both give a verdict, so
 
 The scorer reads only the log and produces, per round, the two numbers the architecture doc defines: restatement fidelity, with `decision` and `key_terms` weighted double and a `wrong` on `decision` scoring zero; and term acceptance per term, with a mismatch below one half. Drift is the change in fidelity between consecutive rounds. Both parties run the scorer on the same log and get the same numbers.
 
-The scheduler implements the README's drift model with the party's constants `c` and `k`, plus a fixed maximum interval. In the terminal the maximum interval is in minutes and the practical trigger is a person typing `parity card`. Event triggers such as before commit or before a pull request belong to the Claude Code mod, which calls the same `resyncDue` function.
+The scheduler implements the README's drift model with the party's constants `c` and `k`, plus a fixed maximum interval. In the terminal the maximum interval is in minutes and the practical trigger is a person typing `parity card`. The Claude Code mod holds handoffs such as a pull request until synced. It does not schedule resyncs.
 
 ## CLI
 
@@ -213,7 +213,7 @@ First run in a directory asks for a display name and writes `.parity/config.json
 
 ## Demo
 
-`engine/demo/` holds two directories, `alice` and `bob`, each a working directory with its own config, context, and script. Alice's brief and Bob's brief describe the same retry feature and disagree on one term: Alice's `idempotent` means safe to repeat with the same key, Bob's means safe to repeat at all. The scripted teach-backs are faithful, the scripted grades mark the term `partly`, and the term check surfaces the difference.
+`engine/demo/` holds two directories, `alice` and `bob`, each a working directory with its own config, context, and script. Alice's brief and Bob's brief describe the same Delete account feature and disagree on one term: Alice's `delete` erases the person and keeps their orders, Bob's removes every row tied to the account. The scripted teach-backs are faithful, the scripted grades mark the term `partly`, and the term check surfaces the difference.
 
 Two terminals:
 
@@ -228,5 +228,8 @@ One process, for CI: `npm run demo` runs both sessions over a real HTTP relay in
 
 - The benchmark harness from [evaluation.md](evaluation.md). It will drive two `Session`s with scripted or model adapters over a memory channel and score the log. The pieces it needs exist; the plants and raters do not.
 - The git channel.
-- The Claude Code mod. It is a thin hooks module over `Session` with a pane for status and the gate, and event triggers for commit, pull request, and handoff.
 - More than two parties. The rules and state are written for a pair. A hub form, where each party cards against a shared canonical card, is the planned generalization.
+
+## Claude Code
+
+The mod lives in [`claude-code/`](../claude-code/) and is described in [claude-code.md](claude-code.md). It does not import the engine. It reads `.parity/log.jsonl` with [`lib/status.mjs`](../claude-code/lib/status.mjs), a dependency-free reimplementation of the status logic in `state.ts`, so it works without `npm link`. `test/check.test.ts` replays the demo round and checks the copy agrees with `state.ts` after every entry. `parity check --json` gives the engine's view for CI and git hooks.
